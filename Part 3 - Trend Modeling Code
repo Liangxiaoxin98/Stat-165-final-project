@@ -53,3 +53,15 @@ print(f"Human_CA coefficient:     {model.coef_[1]:.6f}")
 print(f"SevereDrought coefficient:{model.coef_[2]:.6f}")
 print(f"Intercept (log-scale):    {model.intercept_:.6f}")
 print(f"\nForecasted Total Burned Acres for 2025 (back-transformed): {forecast_2025:,.0f} acres")
+
+# Calculate 80% CI 
+y_log_pred = model.predict(X)
+residual_std = np.std(y_log - y_log_pred)
+
+z = 1.28
+log_lower = log_pred_2025 - z * residual_std
+log_upper = log_pred_2025 + z * residual_std
+lower_bound = np.exp(log_lower)
+upper_bound = np.exp(log_upper)
+
+lower_bound, upper_bound
