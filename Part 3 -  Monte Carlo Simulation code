@@ -1,0 +1,45 @@
+# Monte Carlo
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+calfire_df = pd.read_csv("mapdataall.csv") 
+calfire_df["incident_dateonly_created"] = pd.to_datetime(calfire_df["incident_dateonly_created"], errors='coerce')
+calfire_df["Year"] = calfire_df["incident_dateonly_created"].dt.year
+calfire_df["Month"] = calfire_df["incident_dateonly_created"].dt.month
+
+first_half_df = calfire_df[calfire_df["Month"] <= 6]
+burned_by_year = first_half_df.groupby("Year")["incident_acres_burned"].sum().reset_index()
+burned_by_year = burned_by_year[burned_by_year["Year"].between(2010, 2024)]
+
+acres = burned_by_year["incident_acres_burned"].values
+log_acres = np.log(acres[acres > 0]) 
+log_mean = np.mean(log_acres)
+log_std = np.std(log_acres)
+
+np.random.seed(42)
+simulated = np.random.lognormal(mean=log_mean, sigma=log_std, size=10000)
+
+observed_min = 61205
+simulated = np.maximum(simulated, observed_min)
+
+p10 = np.percentile(simulated, 10)
+p90 = np.percentile(simulated, 90)
+median = np.median(simulated)
+historical_avg = np.mean(acres)
+
+plt.figure(figsize=(10, 5))
+sns.histplot(simulated, bins=50, kde=True, color="orange")
+plt.axvline(p10, color='blue', linestyle='--', label=f'10th Percentile ≈ {p10:.0f}')
+plt.axvline(p90, color='green', linestyle='--', label=f'90th Percentile ≈ {p90:.0f}')
+plt.axvline(median, color='red', linestyle='-', label=f'Median Forecast = {median:.0f}')
+plt.axvline(historical_avg, color='gray', linestyle=':', label=f'Historical Avg ≈ {historical_avg:.0f}')
+plt.title('Monte Carlo Simulation of 2025 Wildfire Acreage (Jan–Jun)')
+plt.xlabel('Acres Burned')
+plt.ylabel('Frequency')
+plt.ticklabel_format(style='plain', axis='x')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
