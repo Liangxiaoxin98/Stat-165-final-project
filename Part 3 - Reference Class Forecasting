@@ -1,0 +1,27 @@
+#Reference Class Forecasting
+import pandas as pd
+df = pd.read_csv("mapdataall.csv")  
+df['incident_dateonly_created'] = pd.to_datetime(df['incident_dateonly_created'], errors='coerce')
+
+
+df_all = df[
+    (df['incident_is_final'] == 'Y') &
+    (df['incident_acres_burned'].notnull()) &
+    (df['incident_dateonly_created'].dt.month >= 1) &
+    (df['incident_dateonly_created'].dt.month <= 6)].copy()
+
+df_all['year'] = df_all['incident_dateonly_created'].dt.year
+
+
+df_all = df_all[df_all['year'].between(2010, 2024)]
+
+
+burned_all_years = (
+    df_all.groupby('year')['incident_acres_burned']
+    .sum()
+    .round(0)
+    .astype(int)
+    .reset_index(name='acres_burned_Jan1_to_Jun30'))
+
+
+burned_all_years
