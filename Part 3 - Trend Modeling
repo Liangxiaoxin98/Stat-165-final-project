@@ -1,0 +1,55 @@
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+
+calfire = pd.read_csv("mapdataall.csv")
+calfire["incident_dateonly_created"] = pd.to_datetime(calfire["incident_dateonly_created"], errors="coerce")
+calfire["Year"] = calfire["incident_dateonly_created"].dt.year
+total_acres = calfire.groupby("Year")["incident_acres_burned"].sum().reset_index()
+total_acres.columns = ["Year", "Total_Acres"]
+total_acres = total_acres[total_acres["Year"].between(2014, 2023)].copy()
+
+lightning = pd.read_csv("Lightning_Fires_by_Geographic_Area__2014_2024_.csv")
+lightning = lightning[lightning["Year"].between(2014, 2023)].copy()
+lightning["Lightning_CA"] = lightning["Northern California"] + lightning["Southern California"]
+lightning = lightning[["Year", "Lightning_CA"]]
+
+human = pd.read_csv("Human-Caused_Fires_by_Geographic_Area__2014_2024_.csv")
+human = human[human["Year"].between(2014, 2023)].copy()
+human["Human_CA"] = human["Northern California"] + human["Southern California"]
+human = human[["Year", "Human_CA"]]
+
+drought = pd.read_csv("USDM-california.csv")
+drought["MapDate"] = pd.to_datetime(drought["MapDate"], format="%Y%m%d")
+drought["Year"] = drought["MapDate"].dt.year
+drought["SevereDrought"] = drought["D3"] + drought["D4"]
+
+drought_yearly = drought[(drought["Year"] >= 2014) & (drought["Year"] <= 2023)]
+drought_avg_by_year = drought_yearly.groupby("Year")["SevereDrought"].mean().reset_index()
+print("Average D3 + D4 (%) per Year (2014–2023):")
+print(drought_avg_by_year)
+
+avg_drought_value = drought_avg_by_year["SevereDrought"].mean()
+print(f"\nFinal avg drought value used in model: {avg_drought_value:.2f}%")
+
+df = total_acres.merge(lightning, on="Year").merge(human, on="Year").merge(drought_avg_by_year, on="Year")
+X = df[["Lightning_CA", "Human_CA", "SevereDrought"]]
+y_log = np.log(df["Total_Acres"])
+
+model = LinearRegression()
+model.fit(X, y_log)
+
+new_data_2025 = pd.DataFrame({
+    "Lightning_CA": [304],
+    "Human_CA": [6000],
+    "SevereDrought": [avg_drought_value]
+})
+log_pred_2025 = model.predict(new_data_2025)[0]
+forecast_2025 = np.exp(log_pred_2025)
+
+print("\nLog-Linear Regression Model Coefficients:")
+print(f"Lightning_CA coefficient: {model.coef_[0]:.6f}")
+print(f"Human_CA coefficient:     {model.coef_[1]:.6f}")
+print(f"SevereDrought coefficient:{model.coef_[2]:.6f}")
+print(f"Intercept (log-scale):    {model.intercept_:.6f}")
+print(f"\nForecasted Total Burned Acres for 2025 (back-transformed): {forecast_2025:,.0f} acres")
